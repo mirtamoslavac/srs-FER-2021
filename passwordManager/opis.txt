@@ -1,0 +1,37 @@
+Implementirani pototip alata za pohranu zaporki bazira se na simetričnoj kriptografiji.
+Kao centralni pristup za osiguravanje i povjerljivosti i integriteta koristi se autentificirana šifra.
+
+Postupak korištenja autentificirane šifre temelji se na kriptografskom AES ključu (dobiven putem klasa SecretKey i SecretKeyFactory)
+deriviranom iz glavne zaporke pomoću PBEKeySpec klase, pseudonasumično generiranog salta poznate duljine (pomoću kriptografskog generatora pseudoslučajnih brojeva) 
+te odabrane kombinacije funkcije za derivaciju ključa PBKDF2 i HmacSHA256 za dohvat MAC-a putem kriptografske funkcije sažetka.
+Tako dobiven tajni ključ koristi se za enkripciju/dekripciju para adresa-zaporka s njemu prvotno kriptografski pseudoslučajno generiranom inicijalizacijskom vektoru.
+Kako bi se osiguralo da napadač ne može razaznati koje su duljine adresa i zaporki, implementirane su metode nadopunjavanja i uklanjanja nadopunjenih znakova para u obliku čistog teksta.
+Sama enkripcija/dekripcija provodi se putem zadane kombinacije AES/GCM/NoPadding algoritma, što upravo i predstavlja korištenje principa autentificirane šifre.
+Jedan redak u alatu podrazumijeva šifrat uz sebe sadrži njemu prethodno navedene incijalizacijski vektor te salt, kao i oznaku koja osigurava integritet.
+Kako bi se šifrat mogao dekriptirati, koriste se uz njega spremljeni IV i salt.
+Konačan redak u datoteci jest formata SaltIVŠifratPadding, dok je šifrat spremljen u formatu adresaDELIMITER_CHARACTERzaporka.
+Ovako formatiran niz znakova pretvara se u heksadecimalni zapis i pohranjuje se u datoteku, na kraj datoteke ili na poziciji retka gdje su bile pohranjene ista adresa i stara zaporka, 
+u slučaju osvježavanja zaporke već postojeće adrese.
+Provjera postoji li već zadana adresa unutar alata izvedena je na način da se svaki redak dekriptira i uspoređuje se dohvaćena adresa i predana adresa u obliku čistog teksta 
+	- koristi se i za dohvaćanje zaporke te osvježavanje novom zaporkom za istu adresu.
+Kao posljedica ovakve provjere, bilo što što se želi obaviti nad već inicijaliziranim alatom mora se usporediti s prvim parom koji je enkriptiran postupkom iz glavne zaporke.
+	- zbog toga nije potrebno niti spremati glavnu zaporku, već se tijekom postupka dekripcije prvog para neispravnom zaporkom može utvrditi nesklad u predanoj i onoj zaporci 
+	  pomoću koje je ostvarena enkripcija para adresa-zaporka.
+Na taj način, u alat pohranjujemo samo retke parova i njima karakterističnih dodatnih podataka, a inicijalizacija samog alata nije povezana uz glavnu zaporku 
+	- ona zaporka koja se navede pri upisu prvog unosa u alat ostaje glavna zaporka sve dok postoje nekompromitirani zapisi u datoteci.
+Bilo koja promjena nad retcima u heksadekadskom zapisu ili unos neispravne glavne zaporke označava komprimitiranost alata za pohranu 
+	- ukoliko se radi o promjeni redaka, onda se trenutna inačica alata više ne može koristiti i potrebno je inicijalizirati novu inačicu
+	- ukoliko se radi o neispravno unesenoj glavnoj zaporci, trenutna inačica alata je i dalje sigurna i kako bi joj se pristupilo potrebno je unijeti ispravnu glavnu zaporku.
+
+Za pokretanje putem shell skripte, potrebno je u terminal upisati -> echo "yes" | bash skripta.sh (ukoliko je Bash odabran za shell)
+
+Za pokretanje na Windowsima potrebno je u terminal upisati:
+> cd src\main\java\hr\fer\srs\
+> javac -d ..\..\..\..\..\..\bin PasswordManager.java commands\*.java elements\*.java exceptions\*.java
+> cd ..\..\..\..\..\..\
+> java -cp bin hr.fer.srs.PasswordManager <željeni argumenti>
+
+Opis korištenja različitih argumenata i funkcionalnosti alata:
+> java -cp bin hr.fer.srs.PasswordManager init 				- inicijalizacija datoteke passwordManager.txt koja će služiti za pohranu prethodno opisanih unosa u alat
+> java -cp bin hr.fer.srs.PasswordManager put MasterPassword ABC 123 	- unos para ABC-123 u alat
+> java -cp bin hr.fer.srs.PasswordManager get MasterPassword ABC	- dohvaćanje lozinke za adresu ABC
