@@ -1,0 +1,62 @@
+Specifičnosti za sigurnu pohranu zaporki:
+	Osigurana je sigurna pohrana zaporki izbjegavanjem spremanja u obliku čistog teksta, već se sprema kriptografski sažetak te zaporke uz salt koji je specifičan za taj sažetak.
+Izračun kriptografskog sažetka postignut je korištenjem PBKDF2 funkcije za derivaciju ključa - odabrana je ta funkcija jer je,
+za razliku od obične funkcije sažetka npr. SHA256, dizajniran tako da bude spor pri izvođenju kako bi bilo teže pogađati zaporke u malom periodu vremena.
+
+Struktura spremljenih podataka u datoteci naziva database.txt (datoteka u kojoj se nalaze pohranjeni podaci o korisnicima):
+    1. redak: serijalizirana mapa - ključ: sažetak korisničkog imena, vrijednost: set već korištenih zaporki za to korisničko ime kao stringovi formata "sažetakzaporkeSalt"
+    ostali redci: format "sažetakkorisničkogimenaSažetakzaporkeSaltZastavicazaobaveznupromjenu"
+Svaki element u redcima s informacijama o korisniku te "sažetakzaporkeSalt" elementi seta određene su duljine te se u prema tome i parsiraju.
+
+Prilikom unosa zaporki u terminal, same zaporke se ne ispisuju na terminal što smanjuje prijetnju "shoulder surfinga",
+tj. napadač koji se nalazi u neposrednoj blizini korisnika koji unosi zaporku ne vidi na ekranu ono što se unosi.
+
+Specifičnosti vezani uz kompleksnost:
+	Implementirani su mehanizmi za postizanje određene kompleksnosti zaporki provjerom je li zaporka dulja od 8 znakova
+te provjerom sadrži li upisana zaporka minimalno jedan broj/veliko slovo/specijalan znak.
+	Spremanjem već korištenih zaporki uz određeno korisničko ime osigurava nekorištenje kompromitiranih/već korištenih (ali promijenjenih) zaporki,
+što smanjuje uspješnost proboja napadača ukoliko sazna prethodno povezanu zaporku uz to korisničko ime, a ta je zaporka promijenjena u međuvremenu.
+	Nije implementirana provjera sadrži li zaporka riječi iz rječnika zbog kompleksnosti implementacije, no to je isto jedan od pristupa povećanja kompleksnosti zaporke.
+
+Specifičnosti za online napade pogađanjem (iako je ovo offline alat):
+	Implementiran pristup ponovljenog unosa zaporke maksimalno triput uslijed prethodno netočnog unosa pri jednom korištenju Login alata.
+Takav pristup ne štiti korisnika od potencijalnog napada grubom silom, jer napadač može ponovno upisivati zaporke ponovnim pokretanjem alata s tim korisničkim imenom.
+No, u jednu ruku implementirano je kako bi se pravom korisniku dala šansa za ponovni unos uslijed neopažene pogreške, a da ne mora pokretati ponovno alat, 
+ali i kako bi manje ozbiljnom napadaču potencijalno "dosadilo" probijati zaporku nakon nekog vremena jer se svaki put mora iznova pokrenuti alat, 
+ali, kao što je već naglašeno, ovaj pristup nimalo ne štiti od ozbiljnih napadača.
+	Nije implementiran pristup oduljenog čekanja na ponovni unos zaporke za određeno korisničko ime nakon prethodnog netočnog unosa jer ono više ima smisla u online okruženju,
+a kako se ovi alati trenutno koriste offline, rezultat korištenja bi bio isti kao i u prethodno navedenom slučaju s određenom dopuštenom količinom ponovnog unosa zaporke pa je preskočena implementacija.
+	Isto tako nije implementiran pristup zaključavanja mogućnosti prijave korisnika nakon određenog broja neuspješnih prijava (i tada bi bila potrebna intervencija administratora dodjelom nove zaporke
+ili samo omogućavanjem ponovne prijave bez promjene zaporke) kako bi se u online okruženju izbjegli potencijalni DoS napadi s ciljem namjernog zaključavanja pristupa pravom korisniku.
+
+Specifičnosti za očuvanje integriteta:
+	Osigurano je i obavještavanje korisnika alata za upravljanje zaporkama o potencijalno nepoželjno promijenjenoj datoteci s podacima o korisnicima
+usporedbom netom izračunatog sažetka sa spremljenim sažetkom datoteke s podacima o korisnicima pri zadnjoj promjeni u datoteci databaseHash.txt.
+Idealno bi ta datoteka sa sažetkom bila pohranjena na nekom udaljenom računalu kako napadač ne bi mogao promijeniti i datoteku sa spremljenim sažetkom te tako sakriti činjenicu da je
+nešto promijenjeno u datoteci s korisnicima, te na taj bi se način dohvaćala i uspoređivala vrijednost s izračunatom vrijednošću datoteke s korisnicima u tom trenu na lokalnom računalu.
+
+Specifičnosti o razini dostupnih informacija:
+	Administrator korištenjem alata za upravljanjem korisničkim imenima dobiva konkretne informacije o greškama koje su nastale korištenjem alata,
+dok obični korisnici korištenjem alata za prijavu jedino dobiju informaciju o tome je li prijava uspješna ili ne. Ukoliko korisnici upisuju novu zaporku,
+uslijed neispravno unesene nove zaporke/ponovnog unosa nove zaporke dobije se poruka o neuspjeloj promjeni zaporke bez detalja o pogrešci kako napadač ne bi
+mogao izvući previše informacija o sustavu, a ti su isti detalji dio poruke administratoru uporabom UserMgmt alata u sličnim slučajevima s promjenom zaporke.
+
+Za pokretanje, potrebno je u terminal upisati:
+> cd src/main/java/hr/fer/srs
+> javac -d ../../../../../../bin *.java commands/*.java elements/*.java exceptions/*.java
+> cd ../../../../../../
+> java -cp bin hr.fer.srs.(UserMgmt|Login) <željeni argumenti>
+
+Priložena skripta za demonstraciju rada programa ne funkcionira ukoliko se u alatima koristi System.console() za unos zaporki, ali se koristi takav pristup
+jer je jedna od potencijalnih prijetnji shoulder surfing pa je poželjno sakriti unos.
+Zbog toga, skripta služi samo za orijentaciju kao bi se uspješno ručno demonstrirale značajke alata, uključujući rubne slučajeve
+(iako bi sve normalno funkcioniralo putem skripte ako se u alatima koristi Scanner za unos, no tada bi se izgubilo skrivanje upisanih zaporki).
+
+Opis korištenja različitih argumenata i funkcionalnosti alata (korisničko ime se predaje pri pokretanju kao argument, a sve ostalo potrebno je unijeti korištenjem alata):
+> java -cp bin hr.fer.srs.UserMgmt add user             - dodavanje novog korisnika (traženo: korisničko ime i zaporka)
+> java -cp bin hr.fer.srs.UserMgmt passwd user          - promjena zaporke postojećeg korisnika (traženo: korisničko ime i nova zaporka)
+> java -cp bin hr.fer.srs.UserMgmt forcepass user       - forsiranje promjene zaporke korisnika, pri idućoj prijavi (traženo: korsničko ime)
+> java -cp bin hr.fer.srs.UserMgmt del user             - uklanjanje postojećeg korisnika (traženo: korisničko ime)
+
+> java -cp bin hr.fer.srs.Login login user              - upisivanje korisničkog imena i zaporke (traženo: korisničko ime i zaporka)
+                                                            + promjena zaporke nakon uspješne prijave, ako je tako postavio administrator (+ traženo: nova zaporka)
